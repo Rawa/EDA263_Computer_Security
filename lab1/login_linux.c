@@ -11,12 +11,15 @@
 #include <pwd.h>
 #include <sys/types.h>
 #include <crypt.h>
+#include "pwent.h"
 /* Uncomment next line in step 2 */
 /* #include "pwent.h" */
 
 #define TRUE 1
 #define FALSE 0
 #define LENGTH 16
+#define LOGIN_LIMIT 100
+#define AGE_LIMIT 10
 
 void sighandler() {
 
@@ -26,7 +29,8 @@ void sighandler() {
 
 int main(int argc, char *argv[]) {
 
-	struct passwd *passwddata; /* this has to be redefined in step 2 */
+    signal(SIGINT, SIG_IGN);
+	mypwent *passwddata; /* this has to be redefined in step 2 */
 	/* see pwent.h */
 
 	char important[LENGTH] = "***IMPORTANT***";
@@ -35,7 +39,7 @@ int main(int argc, char *argv[]) {
 	//char   *c_pass; //you might want to use this variable later...
 	char prompt[] = "password: ";
 	char *user_pass;
-
+    int i = 0;
 	sighandler();
 
 	while (TRUE) {
@@ -47,30 +51,55 @@ int main(int argc, char *argv[]) {
 		fflush(NULL); /* Flush all  output buffers */
 		__fpurge(stdin); /* Purge any data in stdin buffer */
 
-		if (gets(user) == NULL) /* gets() is vulnerable to buffer */
+		if (fgets(user, LENGTH, stdin) == NULL) /* gets() is vulnerable to buffer */
 			exit(0); /*  overflow attacks.  */
 
 		/* check to see if important variable is intact after input of login name - do not remove */
 		printf("Value of variable 'important' after input of login name: %*.*s\n",
 				LENGTH - 1, LENGTH - 1, important);
+        for(i=0; i < LENGTH; i++){
+            if(user[i] == '\n'){
+                user[i] = '\0';
+                break;
+            }
+        }
 
-		user_pass = getpass(prompt);
-		passwddata = getpwnam(user);
+	    user_pass = getpass(prompt);
+		passwddata = mygetpwnam(user);
 
 		if (passwddata != NULL) {
+            if(passwddata->pwfailed > LOGIN_LIMIT){
+                printf("Your account has been suspended, contact the administrator\n");
+                return 0;
+            }
 			/* You have to encrypt user_pass for this to work */
 			/* Don't forget to include the salt */
-
-			if (!strcmp(user_pass, passwddata->pw_passwd)) {
-
+            user_pass = crypt(user_pass, passwddata->passwd_salt);
+			if (!strcmp(user_pass, passwddata->passwd)) {
+                if(passwddata->pwfailed != 0){
+                    printf(" *** WARNING! *** Failed attemps since last login: %d\n", passwddata->pwfailed);
+                    passwddata->pwfailed = 0;
+                }
+                passwddata->pwage++;
+                if(passwddata->pwage > AGE_LIMIT){
+                    printf(" *** WARNING! *** Your password is getting old, like Gandalf!\n");
+                }
+                mysetpwent(user, passwddata);
 				printf(" You're in !\n");
 
+                setuid(passwddata->uid);
+                execl("/bin/sh", "sh", NULL);
 				/*  check UID, see setuid(2) */
 				/*  start a shell, use execve(2) */
 
-			}
-		}
-		printf("Login Incorrect \n");
+			} else {
+                printf("Login Incorrect \n");
+                passwddata->pwfailed++;
+                mysetpwent(user, passwddata);
+            }
+		} else {
+            printf("Login Incorrect \n");
+        }
 	}
 	return 0;
 }

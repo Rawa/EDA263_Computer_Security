@@ -14,9 +14,9 @@
 
 /*
  Return pointer to password entry for specified user.
- 
+
  Upon error, or if the user couldn't be found, NULL is returned.
- 
+
  Note: The returned pointer points to static data.
  */
 mypwent *mygetpwnam(char *name) {
@@ -30,7 +30,6 @@ mypwent *mygetpwnam(char *name) {
 	/* Open file, return NULL if it failed. */
 	if ((file = fopen(MYPWENT_FILENAME, "rb")) == NULL)
 		return NULL;
-
 	/* Read each line, looking for the right entry. */
 	while (fgets(buffer, sizeof(buffer), file) != NULL) {
 		if (sscanf(buffer, "%[^:]:%d:%[^:]:%[^:]:%d:%d", ent.pwname, &ent.uid,
@@ -50,7 +49,7 @@ mypwent *mygetpwnam(char *name) {
 
 /*
  Update password entry for user.
- 
+
  Upon error, or if the user couldn't be found, -1 is returned,
  otherwise 0.
  */
