@@ -18,18 +18,14 @@
 #define TRUE 1
 #define FALSE 0
 #define LENGTH 16
-#define LOGIN_LIMIT 100
+#define LOGIN_LIMIT 1000
 #define AGE_LIMIT 10
-
-void sighandler() {
-
-	/* add signalhandling routines here */
-	/* see 'man 2 signal' */
-}
 
 int main(int argc, char *argv[]) {
 
     signal(SIGINT, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGQUIT, SIG_IGN);
 
 	mypwent *passwddata;
 
@@ -40,7 +36,6 @@ int main(int argc, char *argv[]) {
 	char *user_pass;
 
     int i = 0;
-	sighandler();
 
 	while (TRUE) {
 		/* check what important variable contains - do not remove, part of buffer overflow test */
@@ -79,6 +74,13 @@ int main(int argc, char *argv[]) {
             }
             /* Encrypt the password entered by the user and validate with the user data */
             user_pass = crypt(user_pass, passwddata->passwd_salt);
+
+            if(!user_pass){
+                /*Crypt failed, exit login shell */
+                printf("Crypt failed, contact the administrator\n");
+                return 0;
+            }
+
 			if (!strcmp(user_pass, passwddata->passwd)) {
                 /* If there has been failed login attempts notify the user */
                 if(passwddata->pwfailed != 0){
@@ -96,9 +98,13 @@ int main(int argc, char *argv[]) {
 				printf(" You're in !\n");
 
                 /* Lower the rights of the program to the user privilege level */
-                setuid(passwddata->uid);
-                /* Start shell */
-                execl("/bin/sh", "sh", NULL);
+                if(setuid(passwddata->uid) == 0){
+                    /* Start shell */
+                    execl("/bin/sh", "sh", NULL);
+                }
+                /* Setuid failed*/
+                printf("Setuid failed, contact the administrator\n");
+                return 0;
 			} else {
                 /* If bad password, increase pwfailed counter */
                 passwddata->pwfailed++;
@@ -107,6 +113,7 @@ int main(int argc, char *argv[]) {
 		}
         /* Notify user about incorrect login information. */
         printf("Login Incorrect \n");
+        sleep(1);
 	}
 	return 0;
 }
